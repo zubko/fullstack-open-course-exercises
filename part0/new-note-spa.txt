@@ -1,0 +1,20 @@
+title New Note with SPA
+
+note over browser
+custom submit button handler is called:
+- the text and timestamp are stored as object
+- this object is added to the list which was 
+received from the backend
+- the UI list is re-rendered
+- POST JSON request is executed with this object 
+as the data
+end note
+
+browser->server: HTTP POST https://fullstack-exampleapp.herokuapp.com/new_note_spa JSON {content:'..', date: '..'}
+
+note over server:
+server handles the request, stores the
+data from it and sends a JSON response
+end note
+
+server-->browser: Status 201 Created. JSON {"message":"note created"}

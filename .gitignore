@@ -1,6 +1,9 @@
 # Local folder structure
 /tmp
 
+# Editors
+.vscode
+
 # Logs
 logs
 *.log

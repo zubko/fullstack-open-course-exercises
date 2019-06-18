@@ -1,20 +1,33 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 
 import Filter from "./components/Filter";
 import PersonForm from "./components/PersonForm";
 import Persons from "./components/Persons";
+import axios from "axios";
+
+const usePersonFetch = setter => {
+  useEffect(() => {
+    axios
+      .get("http://localhost:3001/persons")
+      .then(response => {
+        setter(response.data);
+      })
+      .catch(error => {
+        console.warn(`Can't fetch persons: ${error}`);
+      });
+  }, [setter]);
+};
 
 const App = () => {
-  const sortByPersonName = (p1, p2) => p1.name.localeCompare(p2.name);
+  const [persons, setPersons] = useState([]);
 
-  const [persons, setPersons] = useState(
-    [
-      { name: "John Lovelace", number: "123-456-9876" },
-      { name: "Arto Lovelace", number: "123-456-7890" },
-      { name: "Jack Lovelace", number: "123-456-3453" },
-      { name: "Mick Lovelace", number: "123-456-1234" }
-    ].sort(sortByPersonName)
+  const compareByPersonName = (p1, p2) => p1.name.localeCompare(p2.name);
+  const setPersonsSorted = useCallback(
+    persons => setPersons([...persons].sort(compareByPersonName)),
+    [setPersons]
   );
+  usePersonFetch(setPersonsSorted);
+
   const [filter, setFilter] = useState("");
   const [newName, setNewName] = useState("");
   const [newNumber, setNewNumber] = useState("");
@@ -40,21 +53,18 @@ const App = () => {
     if (!validateInput()) {
       return;
     }
-    setPersons(
-      persons
-        .concat({ name: newName, number: newNumber })
-        .sort(sortByPersonName)
-    );
+    const newPerson = { name: newName, number: newNumber };
+    setPersonsSorted(persons.concat(newPerson));
     setNewName("");
     setNewNumber("");
   };
 
-  const filteredPersons = filter
-    ? persons.filter(
-        p =>
-          p.name.toLocaleLowerCase().indexOf(filter.toLocaleLowerCase()) !== -1
-      )
-    : persons;
+  let filteredPersons = persons;
+  if (filter) {
+    filteredPersons = persons.filter(
+      p => p.name.toLocaleLowerCase().indexOf(filter.toLocaleLowerCase()) !== -1
+    );
+  }
 
   return (
     <div>

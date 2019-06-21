@@ -3,15 +3,13 @@ import React, { useState, useEffect, useCallback } from "react";
 import Filter from "./components/Filter";
 import PersonForm from "./components/PersonForm";
 import Persons from "./components/Persons";
-import axios from "axios";
+import phonebookService from "./services/phonebookService";
 
 const usePersonFetch = setter => {
   useEffect(() => {
-    axios
-      .get("http://localhost:3001/persons")
-      .then(response => {
-        setter(response.data);
-      })
+    phonebookService
+      .getAll()
+      .then(setter)
       .catch(error => {
         console.warn(`Can't fetch persons: ${error}`);
       });
@@ -41,10 +39,35 @@ const App = () => {
       alert("Number can't be empty!");
       return false;
     }
-    if (persons.findIndex(p => p.name === newName) !== -1) {
-      alert(`${newName} is already in the phonebook.`);
+    if (persons.find(p => p.name === newName && p.number === newNumber)) {
+      alert(`${newName} with number ${newNumber} is already in the phonebook.`);
       return false;
     }
+
+    return true;
+  };
+
+  const checkUpdateNumber = () => {
+    const p = persons.find(p => p.name === newName);
+    if (!p) {
+      return false;
+    }
+    if (
+      !window.confirm(
+        `${newName} is already in the phonebook.\nDo you want to update the number?`
+      )
+    ) {
+      return false;
+    }
+    const id = p.id;
+    phonebookService
+      .put(id, { ...p, number: newNumber })
+      .then(updatedPerson => {
+        setPersons(persons.map(p => (p.id !== id ? p : updatedPerson)));
+        setNewName("");
+        setNewNumber("");
+      })
+      .catch(() => alert("Failed to update the number on the server."));
     return true;
   };
 
@@ -53,10 +76,28 @@ const App = () => {
     if (!validateInput()) {
       return;
     }
+    if (checkUpdateNumber()) {
+      return;
+    }
     const newPerson = { name: newName, number: newNumber };
-    setPersonsSorted(persons.concat(newPerson));
-    setNewName("");
-    setNewNumber("");
+    phonebookService
+      .create(newPerson)
+      .then(newPerson => {
+        setPersonsSorted(persons.concat(newPerson));
+        setNewName("");
+        setNewNumber("");
+      })
+      .catch(() => alert("Failed to send a person to the server."));
+  };
+
+  const handleDelete = id => {
+    if (!window.confirm("Are you sure?")) return;
+    phonebookService
+      .del(id)
+      .then(() => {
+        setPersons(persons.filter(p => p.id !== id));
+      })
+      .catch(() => alert("Failed to delete from the server."));
   };
 
   let filteredPersons = persons;
@@ -79,7 +120,7 @@ const App = () => {
         onSubmit={handleNameSubmit}
       />
       <h3>Numbers</h3>
-      <Persons list={filteredPersons} />
+      <Persons list={filteredPersons} onDelete={handleDelete} />
     </div>
   );
 };

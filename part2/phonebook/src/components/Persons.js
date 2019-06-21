@@ -1,10 +1,18 @@
 import * as React from "react";
 
-const Person = ({ name, number }) => (
+const Person = ({ name, number, onDelete }) => (
   <div>
-    {name}: {number}
+    {name}: {number} <button onClick={onDelete}>delete</button>
   </div>
 );
 
-export default ({ list }) =>
-  list.map(p => <Person key={p.name} name={p.name} number={p.number} />);
+export default ({ list, onDelete }) => [
+  list.map(p => (
+    <Person
+      key={p.id}
+      name={p.name}
+      number={p.number}
+      onDelete={() => onDelete(p.id)}
+    />
+  )),
+];

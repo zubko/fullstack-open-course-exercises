@@ -1,50 +1,72 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 
 import Filter from "./components/Filter";
 import PersonForm from "./components/PersonForm";
 import Persons from "./components/Persons";
+import NotificationList from "./components/NotificationList";
 import phonebookService from "./services/phonebookService";
-
-const usePersonFetch = setter => {
-  useEffect(() => {
-    phonebookService
-      .getAll()
-      .then(setter)
-      .catch(error => {
-        console.warn(`Can't fetch persons: ${error}`);
-      });
-  }, [setter]);
-};
 
 const App = () => {
   const [persons, setPersons] = useState([]);
 
   const compareByPersonName = (p1, p2) => p1.name.localeCompare(p2.name);
+
   const setPersonsSorted = useCallback(
     persons => setPersons([...persons].sort(compareByPersonName)),
     [setPersons]
   );
-  usePersonFetch(setPersonsSorted);
+
+  const notificationsRef = useRef(null);
+  // these 2 callbacks will hide that the ref is used
+  // and they will make the usage more expressive
+  const showError = useCallback(m => notificationsRef.current.showError(m), [
+    notificationsRef
+  ]);
+  const showMessage = useCallback(
+    m => notificationsRef.current.showMessage(m),
+    [notificationsRef]
+  );
 
   const [filter, setFilter] = useState("");
   const [newName, setNewName] = useState("");
   const [newNumber, setNewNumber] = useState("");
 
+  useEffect(() => {
+    phonebookService
+      .getAll()
+      .then(setPersonsSorted)
+      .catch(error => {
+        showError(`Can't fetch persons. ${error}`);
+      });
+  }, [setPersonsSorted, showError]);
+
   const validateInput = () => {
     if (!newName) {
-      alert("Name can't be empty!");
+      showError("Name can't be empty");
       return false;
     }
     if (!newNumber) {
-      alert("Number can't be empty!");
+      showError("Number can't be empty");
       return false;
     }
     if (persons.find(p => p.name === newName && p.number === newNumber)) {
-      alert(`${newName} with number ${newNumber} is already in the phonebook.`);
+      notificationsRef.current.showError(
+        `${newName} with number ${newNumber} is already in the phonebook.`
+      );
       return false;
     }
-
     return true;
+  };
+
+  const checkHandle404Error = (error, name, id) => {
+    if (error.isAxiosError && error.response && error.response.status === 404) {
+      showError(
+        `Information of ${name} has already been removed from the server.`
+      );
+      setPersons(persons.filter(p => p.id !== id));
+      return true;
+    }
+    return false;
   };
 
   const checkUpdateNumber = () => {
@@ -66,8 +88,18 @@ const App = () => {
         setPersons(persons.map(p => (p.id !== id ? p : updatedPerson)));
         setNewName("");
         setNewNumber("");
+        showMessage(`Updated ${p.name}'s number`);
       })
-      .catch(() => alert("Failed to update the number on the server."));
+      .catch(error => {
+        if (checkHandle404Error(error, p.name, id)) {
+          setNewName("");
+          setNewNumber("");
+        } else {
+          showError(
+            `Failed to update ${p.name}'s number on the server. ${error}`
+          );
+        }
+      });
     return true;
   };
 
@@ -83,21 +115,30 @@ const App = () => {
     phonebookService
       .create(newPerson)
       .then(newPerson => {
+        showMessage(`Added ${newPerson.name}`);
         setPersonsSorted(persons.concat(newPerson));
         setNewName("");
         setNewNumber("");
       })
-      .catch(() => alert("Failed to send a person to the server."));
+      .catch(error => showError(`Failed to add ${newPerson.name}. ${error}`));
   };
 
   const handleDelete = id => {
     if (!window.confirm("Are you sure?")) return;
+    let person = persons.find(p => p.id === id);
     phonebookService
       .del(id)
       .then(() => {
+        showMessage(`Removed ${person.name} successfully`);
         setPersons(persons.filter(p => p.id !== id));
       })
-      .catch(() => alert("Failed to delete from the server."));
+      .catch(error => {
+        if (!checkHandle404Error(error, person.name, id)) {
+          showError(
+            `Failed to remove ${person.name} from the server. ${error}`
+          );
+        }
+      });
   };
 
   let filteredPersons = persons;
@@ -109,6 +150,7 @@ const App = () => {
 
   return (
     <div>
+      <NotificationList ref={notificationsRef} />
       <h2>Phonebook</h2>
       <Filter value={filter} onChange={setFilter} />
       <h3>add a new</h3>
